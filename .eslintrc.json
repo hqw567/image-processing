@@ -1,0 +1,20 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react/jsx-runtime",
+    "@electron-toolkit/eslint-config-ts/recommended",
+    "@electron-toolkit/eslint-config-prettier",
+    "prettier"
+  ],
+  "plugins": ["prettier"],
+  "rules": {
+    "react-hooks/exhaustive-deps": "off",
+    "import/no-anonymous-default-export": "off",
+    "@next/next/no-img-element": "off",
+    "jsx-a11y/alt-text": "off",
+    "react/display-name": "off",
+    "semi": "off",
+    "no-unused-vars": "off"
+  }
+}

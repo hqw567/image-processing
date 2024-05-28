@@ -1,0 +1,14 @@
+{ 
+  "compilerOptions": {
+  "noUnusedLocals": false,
+  "noUnusedParameters": false,
+  "baseUrl": ".",
+  "paths": {
+    "@renderer/*": [
+      "src/renderer/src/*"
+    ]
+  }
+  },
+  "files": [],
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
+}

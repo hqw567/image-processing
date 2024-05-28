@@ -1,0 +1,3 @@
+provider: generic
+url: https://github.com/hqw567/image-processing/releases/download/v${version}/
+updaterCacheDirName: image-processing-updater
