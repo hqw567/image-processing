@@ -1,87 +1,107 @@
-name: Build/release Electron app
+name: Build and Release
 
 on:
   push:
     tags:
-      - v*.*.*
+      - 'v*'
 
 jobs:
-  release:
+  build:
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-
+        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - os: macos-latest
+            os_tag: macos
+          - os: ubuntu-latest
+            os_tag: ubuntu
+          - os: windows-latest
+            os_tag: windows
+      fail-fast: false
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
         with:
-          node-version: 20
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        run: corepack enable pnpm && pnpm install
+        run: pnpm install
 
-      - name: build-linux
-        if: matrix.os == 'ubuntu-latest'
-        run: pnpm run build:linux
-
-      - name: build-mac
-        if: matrix.os == 'macos-latest'
-        run: pnpm run build:mac
-
-      - name: build-win
-        if: matrix.os == 'windows-latest'
-        run: pnpm run build:win
+      - name: Build Release Files
+        run: pnpm run build
 
       - name: Upload Artifact for macOS
         if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: release-macos
           path: |
-            dist/*.dmg
-            dist/*.tar.gz
-            dist/latest-mac.yml
+            release/*.dmg
+            release/*.tar.gz
+            release/latest-mac.yml
           retention-days: 1
 
       - name: Upload Artifact for Ubuntu
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: release-linux
           path: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.tar.gz
-            dist/latest-linux.yml
+            release/*.AppImage
+            release/*.deb
+            release/*.tar.gz
+            release/latest-linux.yml
           retention-days: 1
 
-      # - name: Prepare and Upload Artifact for Windows
-      #   if: matrix.os == 'windows-latest'
-      #   run: mv release/latest.yml release/latest-windows.yml
-      #   shell: bash
+      - name: Prepare and Upload Artifact for Windows
+        if: matrix.os == 'windows-latest'
+        run: mv release/latest.yml release/latest-windows.yml
+        shell: bash
 
       - name: Upload Artifact for Windows
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: release-windows
           path: |
-            dist/*.exe
-            dist/*.msi
-            dist/*.zip
-            dist/latest.yml
+            release/*.exe
+            release/*.msi
+            release/*.zip
+            release/latest.yml
           retention-days: 1
 
-      - name: release
-        uses: softprops/action-gh-release@v2
+  create_release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
         with:
-          draft: true
-          files: |
-            dist/*
+          path: release-assets
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release-assets/${{ github.ref_name }}
+          mv release-assets/*/* release-assets/${{ github.ref_name }}/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: Release ${{ github.ref_name }}
+          files: release-assets/${{ github.ref_name }}/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

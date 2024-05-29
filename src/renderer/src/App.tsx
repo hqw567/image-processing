@@ -1,3 +1,9 @@
+import { DndContext, DragOverlay, MouseSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent } from '@dnd-kit/core/dist/types/index'
+import { restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { DragHandleDots2Icon } from '@radix-ui/react-icons'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +15,7 @@ import {
 import { Label } from '@renderer/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@renderer/components/ui/radio-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@renderer/components/ui/tooltip'
+import { nanoid } from 'nanoid'
 import { useEffect, useState } from 'react'
 import toast, { Toaster } from 'react-hot-toast'
 import { Button } from './components/ui/button'
@@ -23,19 +30,19 @@ function App(): JSX.Element {
       directory: string
       createdAt: Date
       modifiedAt: Date
+      id: string
     }[]
   >([])
-
   const [originalFilePath, setOriginalFilePath] = useState('')
   const [customFilePath, setCustomFilePath] = useState('')
-
   const [saveFilePathType, setSaveFilePathType] = useState('1')
-
   const [values, setValues] = useState({
     width: 0,
     height: 0,
     outputName: '',
   })
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
 
   const saveFilePath = saveFilePathType === '1' ? originalFilePath : customFilePath
   useEffect(() => {
@@ -58,6 +65,33 @@ function App(): JSX.Element {
       })
     }
   }, [images])
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5, // 按住不动移动5px 时 才进行拖拽, 这样就可以触发点击事件
+      },
+    }),
+  )
+  const [activeId, setActiveId] = useState(null)
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active?.id)
+  }
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over) return
+
+    if (active.id !== over.id) {
+      const data = [...images]
+
+      const oldIndex = data?.findIndex((item: any) => item?.id === active?.id)
+      const newIndex = data?.findIndex((item: any) => item?.id === over?.id)
+      const newArr = arrayMove(data, oldIndex, newIndex)
+      setImages(newArr)
+    }
+  }
+
   return (
     <>
       <div className='  flex  h-dvh flex-col divide-y '>
@@ -66,7 +100,7 @@ function App(): JSX.Element {
             variant={'outline'}
             onClick={async () => {
               const imgs = await window.electron.ipcRenderer.invoke('select-images')
-              setImages((prev) => [...prev, ...imgs])
+              setImages((prev) => [...prev, ...imgs.map((item: any) => ({ ...item, id: nanoid() }))])
             }}
           >
             添加图片
@@ -75,7 +109,7 @@ function App(): JSX.Element {
             variant={'outline'}
             onClick={async () => {
               const imgs = await window.electron.ipcRenderer.invoke('select-images-folder')
-              setImages((prev) => [...prev, ...imgs])
+              setImages((prev) => [...prev, ...imgs.map((item: any) => ({ ...item, id: nanoid() }))])
             }}
           >
             添加文件夹
@@ -93,31 +127,39 @@ function App(): JSX.Element {
         <div className=' flex flex-1 flex-col overflow-auto border-t p-4'>
           <h3 className=' mb-2 font-bold'>待转换列表</h3>
           <div className=' flex-1 space-y-3 overflow-auto'>
-            {images.map((img, index) => (
-              <div key={index} className=' flex items-center justify-between space-x-2 rounded-lg border p-2'>
-                <div className=' flex items-center space-x-2'>
-                  <p className='  mr-2 flex size-8  shrink-0 items-center justify-center rounded-full border'>
-                    {index + 1}
-                  </p>
-                  <img src={img.path} alt={`image-${index}`} className=' size-20 rounded-md' />
-                  <p className=' line-clamp-1  break-words'>{img.name}</p>
-                </div>
-                <div className=' flex items-center space-x-2'>
-                  <Button
-                    onClick={() => {
-                      setImages((prev) => prev.filter((_, fIndex) => fIndex !== index))
-                    }}
-                    size={'sm'}
-                    variant={'destructive'}
-                  >
-                    删除
-                  </Button>
-                  {/* <Button onClick={() => {}} size={'icon'} variant={'outline'}>
-                    <DragHandleDots2Icon />
-                  </Button> */}
-                </div>
-              </div>
-            ))}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+              onDragStart={handleDragStart}
+              modifiers={[restrictToFirstScrollableAncestor]}
+            >
+              <SortableContext items={images || []} strategy={rectSortingStrategy}>
+                {images.map((item: any, index: number) => {
+                  return (
+                    <Item
+                      key={item.id}
+                      item={item}
+                      id={item.id}
+                      index={index}
+                      onDelete={() => {
+                        setImages((prev) => prev.filter((_, fIndex) => fIndex !== index))
+                      }}
+                    />
+                  )
+                })}
+                <DragOverlay>
+                  {activeId ? (
+                    <Item
+                      item={images.find((item: any) => item.id === activeId)}
+                      id={-1}
+                      index={images.findIndex((item: any) => item.id === activeId)}
+                      isDragOverlay={true}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
         <div className=' flex justify-between  p-4'>
@@ -181,7 +223,7 @@ function App(): JSX.Element {
               </div>
             </div>
           </div>
-          <Dialog>
+          <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button disabled={images.length === 0}>转换为PDF</Button>
             </DialogTrigger>
@@ -293,6 +335,7 @@ function App(): JSX.Element {
               </div>
               <DialogFooter>
                 <Button
+                  disabled={loading}
                   onClick={async () => {
                     const toastId = toast.loading('正在转换中...')
                     try {
@@ -307,6 +350,7 @@ function App(): JSX.Element {
                         toast.success('转换成功', {
                           id: toastId,
                         })
+                        setOpen(false)
                       } else {
                         toast.error('转换失败:\n' + JSON.stringify(res.err, null, 2), {
                           id: toastId,
@@ -332,6 +376,49 @@ function App(): JSX.Element {
 }
 
 export default App
+
+const Item = ({ item, index, id, onDelete }: any) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  }
+
+  return (
+    <div
+      {...attributes}
+      style={style}
+      ref={setNodeRef}
+      key={id}
+      className=' flex items-center justify-between space-x-2 rounded-lg border p-2'
+    >
+      <div className=' flex items-center space-x-2'>
+        <p className='  mr-2 flex size-8  shrink-0 items-center justify-center rounded-full border'>{index + 1}</p>
+        <img src={item.path} alt={`image-${index}`} className=' size-20 rounded-md' />
+        <p className=' line-clamp-1  break-words'>{item.name}</p>
+      </div>
+      <div className=' flex items-center space-x-2'>
+        <Button
+          onClick={() => {
+            onDelete()
+            // setImages((prev) => prev.filter((_, fIndex) => fIndex !== index))
+          }}
+          size={'sm'}
+          variant={'destructive'}
+        >
+          删除
+        </Button>
+        <Button {...listeners} size={'icon'} variant={'outline'}>
+          <DragHandleDots2Icon />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 function preloadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
