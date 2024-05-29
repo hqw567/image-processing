@@ -1,6 +1,6 @@
 {
   "name": "image-processing",
-  "version": "0.0.4",
+  "version": "0.0.7",
   "description": "An Electron application with React and TypeScript",
   "homepage": "https://electron-vite.org",
   "author": "example.com",

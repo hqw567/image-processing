@@ -338,6 +338,7 @@ function App(): JSX.Element {
                   disabled={loading}
                   onClick={async () => {
                     const toastId = toast.loading('正在转换中...')
+                    setLoading(true)
                     try {
                       const res = await window.electron.ipcRenderer.invoke('convert-to-cmyk-pdf', {
                         imageUrls: images.map((img) => img.path),
@@ -360,6 +361,8 @@ function App(): JSX.Element {
                       toast.error('转换失败:\n' + JSON.stringify(error, null, 2), {
                         id: toastId,
                       })
+                    } finally {
+                      setLoading(false)
                     }
                   }}
                 >
