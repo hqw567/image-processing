@@ -46,9 +46,9 @@ jobs:
         with:
           name: release-macos
           path: |
-            release/*.dmg
-            release/*.tar.gz
-            release/latest-mac.yml
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/latest-mac.yml
           retention-days: 1
 
       - name: Upload Artifact for Ubuntu
@@ -57,15 +57,15 @@ jobs:
         with:
           name: release-linux
           path: |
-            release/*.AppImage
-            release/*.deb
-            release/*.tar.gz
-            release/latest-linux.yml
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.tar.gz
+            dist/latest-linux.yml
           retention-days: 1
 
       - name: Prepare and Upload Artifact for Windows
         if: matrix.os == 'windows-latest'
-        run: mv release/latest.yml release/latest-windows.yml
+        run: mv dist/latest.yml dist/latest-windows.yml
         shell: bash
 
       - name: Upload Artifact for Windows
@@ -74,10 +74,10 @@ jobs:
         with:
           name: release-windows
           path: |
-            release/*.exe
-            release/*.msi
-            release/*.zip
-            release/latest.yml
+            dist/*.exe
+            dist/*.msi
+            dist/*.zip
+            dist/latest-windows.yml
           retention-days: 1
 
   create_release:
